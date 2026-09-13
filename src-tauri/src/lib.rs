@@ -136,6 +136,33 @@ pub fn run() {
                     downloading::misc::download_or_update_steamrt3(handle);
                     downloading::misc::download_or_update_steamrt4(handle);
                 }
+
+                // Present the main window. It starts hidden (`visible: false`
+                // in tauri.conf) so compositor hints are applied before the
+                // first map — no flicker, and tiling compositors decide the
+                // correct mode from the start.
+                {
+                    let main = handle.get_window("main").unwrap();
+                    #[cfg(target_os = "linux")]
+                    {
+                        // Native Wayland has no "dialog" window type (that is
+                        // an X11 mechanism Steam relies on via XWayland), so a
+                        // regular toplevel can never request floating.
+                        // Tiling compositors (Hyprland, sway) do float windows
+                        // whose max size is smaller than the tile — use that hint.
+                        let session = std::env::var("XDG_SESSION_DESKTOP").unwrap_or_default().to_ascii_lowercase();
+                        let tiling = session == "hyprland" || session == "sway"
+                            || std::env::var("HYPRLAND_INSTANCE_SIGNATURE").is_ok()
+                            || std::env::var("SWAYSOCK").is_ok();
+                        if tiling {
+                            let _ = main.set_max_size(Some(tauri::Size::Logical(tauri::LogicalSize { width: 1280.0, height: 720.0 })));
+                        }
+                        let _ = main.center();
+                    }
+                    if args::get_launch_install().is_none() {
+                        let _ = main.show();
+                    }
+                }
             }
             Ok(())
         }).invoke_handler(tauri::generate_handler![open_uri, open_folder, empty_folder, open_in_prefix, list_settings, update_settings_third_party_repo_updates, update_settings_default_game_path, update_settings_default_xxmi_path, update_settings_default_fps_unlock_path, update_settings_default_prefix_path, update_settings_default_runner_path, update_settings_default_dxvk_path, update_settings_default_mangohud_config_path, update_settings_download_speed_limit_cmd, update_settings_launcher_action, update_settings_manifests_hide, update_settings_hide_app_tray,
